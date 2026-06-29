@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  angelov:
+    image: ghcr.io/ajvera2000/devops_29_06_26:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    networks:
+      - traefik-public
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.angelov.entrypoints=http"
+        - "traefik.http.routers.angelov.rule=Host(`angelov.byronrm.com`)"
+        - "traefik.http.middlewares.angelov-https-redirect.redirectscheme.scheme=https"
+        - "traefik.http.routers.angelov.middlewares=angelov-https-redirect"
+        - "traefik.http.routers.angelov-secure.entrypoints=https"
+        - "traefik.http.routers.angelov-secure.rule=Host(`angelov.byronrm.com`)"
+        - "traefik.http.routers.angelov-secure.tls=true"
+        - "traefik.http.routers.angelov-secure.tls.certresolver=http"
+        - "traefik.http.routers.angelov-secure.service=angelov"
+        - "traefik.http.services.angelov.loadbalancer.server.port=5000"
+        - "traefik.docker.network=traefik-public"
+
+networks:
+  traefik-public:
+    external: true
