@@ -5,7 +5,7 @@ import re
 
 app = Flask(__name__)
 
-VERSION = "5.1.0"  # Versión de la IA de navegación cuántica
+VERSION = "5.2.0"  # Incrementamos versión por la actualización del módulo de recreación espacial
 
 MESES_ES = {
     1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
@@ -82,6 +82,20 @@ body {
 .btn-theme-toggle:hover { background: rgba(255, 255, 255, 0.2); }
 
 .reloj-contenedor { background-color: var(--bs-light-bg-subtle); border: 1px solid var(--bs-border-color-translucent); }
+
+/* Estilos del Juego de la Culebrita */
+#snakeCanvas {
+    background-color: #020617;
+    border: 2px solid #334155;
+    border-radius: 8px;
+    display: block;
+    margin: 0 auto;
+}
+.score-board {
+    font-family: 'Courier New', monospace;
+    font-size: 1rem;
+    color: #34d399;
+}
 """
 
 PLANTILLA_HTML = """
@@ -118,8 +132,8 @@ PLANTILLA_HTML = """
     <div class="container">
         <div class="row g-4">
             
-            <div class="col-12 col-lg-4">
-                <div class="card p-4 shadow-sm h-100 justify-content-center">
+            <div class="col-12 col-lg-4 d-flex flex-column gap-4">
+                <div class="card p-4 shadow-sm">
                     <div class="d-flex align-items-center mb-3">
                         <div class="rounded-3 p-2 me-3" style="background-color: #e0f2fe; color: #0369a1;"><i class="bi bi-hourglass-split fs-4"></i></div>
                         <h5 class="mb-0 fw-bold text-secondary">Tiempo Estelar de Misión</h5>
@@ -127,6 +141,21 @@ PLANTILLA_HTML = """
                     <div class="rounded-3 p-3 text-center my-2 reloj-contenedor">
                         <h2 class="fw-bold mb-0" id="reloj-pc" style="color: #3b82f6; letter-spacing: -1px;">00:00:00</h2>
                         <small class="text-muted fw-semibold" id="fecha-pc">Cargando fecha estelar...</small>
+                    </div>
+                </div>
+
+                <div class="card p-4 shadow-sm">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="d-flex align-items-center">
+                            <div class="rounded-3 p-2 me-3" style="background-color: #dcfce7; color: #15803d;"><i class="bi bi-controller fs-4"></i></div>
+                            <h5 class="mb-0 fw-bold text-secondary">Simulador Quantum Snake</h5>
+                        </div>
+                        <span class="score-board fw-bold" id="score">SCORE: 0</span>
+                    </div>
+                    <p class="small text-muted mb-3 text-center">Usa las <b>flechas del teclado</b> para recolectar las sondas de energía verde.</p>
+                    <canvas id="snakeCanvas" width="280" height="200"></canvas>
+                    <div class="text-center mt-3">
+                        <button class="btn btn-outline-info btn-sm px-3" onclick="resetearJuego()"><i class="bi bi-play-fill"></i> Reiniciar Enlace</button>
                     </div>
                 </div>
             </div>
@@ -233,6 +262,119 @@ PLANTILLA_HTML = """
                     term.scrollTop = term.scrollHeight;
                 });
         }
+
+        // --- LÓGICA DEL JUEGO DE LA CULEBRITA ---
+        const canvas = document.getElementById("snakeCanvas");
+        const ctx = canvas.getContext("2d");
+        const scale = 10;
+        const rows = canvas.height / scale;
+        const columns = canvas.width / scale;
+
+        let snake = [];
+        let food = {};
+        let d = "RIGHT";
+        let score = 0;
+        let gameInterval;
+
+        function iniciarJuego() {
+            snake = [{ x: 5 * scale, y: 5 * scale }];
+            generarComida();
+            d = "RIGHT";
+            score = 0;
+            document.getElementById("score").innerText = "SCORE: " + score;
+            if(gameInterval) clearInterval(gameInterval);
+            gameInterval = setInterval(dibujarJuego, 90);
+        }
+
+        function generarComida() {
+            food = {
+                x: Math.floor(Math.random() * columns) * scale,
+                y: Math.floor(Math.random() * rows) * scale
+            };
+        }
+
+        document.addEventListener("keydown", direction);
+        function direction(event) {
+            let key = event.keyCode;
+            // Prevenir scroll de la página con las flechas
+            if([37, 38, 39, 40].includes(key)) event.preventDefault();
+
+            if (key == 37 && d != "RIGHT") d = "LEFT";
+            else if (key == 38 && d != "DOWN") d = "UP";
+            else if (key == 39 && d != "LEFT") d = "RIGHT";
+            else if (key == 40 && d != "UP") d = "DOWN";
+        }
+
+        function dibujarJuego() {
+            ctx.fillStyle = "#020617";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Dibujar Culebrita (Color Cian espacial)
+            for (let i = 0; i < snake.length; i++) {
+                ctx.fillStyle = i == 0 ? "#22d3ee" : "#0891b2";
+                ctx.fillRect(snake[i].x, snake[i].y, scale, scale);
+                ctx.strokeStyle = "#020617";
+                ctx.strokeRect(snake[i].x, snake[i].y, scale, scale);
+            }
+
+            // Dibujar Comida (Sonda Verde esmeralda)
+            ctx.fillStyle = "#34d399";
+            ctx.fillRect(food.x, food.y, scale, scale);
+
+            // Posición previa de la cabeza
+            let snakeX = snake[0].x;
+            let snakeY = snake[0].y;
+
+            // Dirección
+            if (d == "LEFT") snakeX -= scale;
+            if (d == "UP") snakeY -= scale;
+            if (d == "RIGHT") snakeX += scale;
+            if (d == "DOWN") snakeY += scale;
+
+            // Si la culebrita come
+            if (snakeX == food.x && snakeY == food.y) {
+                score++;
+                document.getElementById("score").innerText = "SCORE: " + score;
+                generarComida();
+                document.getElementById('terminal').innerHTML += `<span class="log-success">[${new Date().toLocaleTimeString()}] [SNAKE] Sonda de energía recolectada. Nivel de carga: ${score}</span><br>`;
+                const term = document.getElementById('terminal');
+                term.scrollTop = term.scrollHeight;
+            } else {
+                snake.pop(); // Quita la cola
+            }
+
+            let newHead = { x: snakeX, y: snakeY };
+
+            // Control de colisiones (Paredes o ella misma)
+            if (snakeX < 0 || snakeY < 0 || snakeX >= canvas.width || snakeY >= canvas.height || collision(newHead, snake)) {
+                clearInterval(gameInterval);
+                document.getElementById('terminal').innerHTML += `<span class="log-error">[${new Date().toLocaleTimeString()}] [SNAKE] COLISIÓN DETECTADA. Simulación finalizada. Puntaje: ${score}</span><br>`;
+                const term = document.getElementById('terminal');
+                term.scrollTop = term.scrollHeight;
+                
+                // Efecto Game Over en Canvas
+                ctx.fillStyle = "rgba(248, 113, 113, 0.8)";
+                ctx.font = "16px 'Courier New'";
+                ctx.fillText("CONEXIÓN PERDIDA", 65, 100);
+                return;
+            }
+
+            snake.unshift(newHead);
+        }
+
+        function collision(head, array) {
+            for (let i = 0; i < array.length; i++) {
+                if (head.x == array[i].x && head.y == array[i].y) return true;
+            }
+            return false;
+        }
+
+        function resetearJuego() {
+            iniciarJuego();
+        }
+
+        // Ejecutar juego al cargar la página
+        iniciarJuego();
     </script>
 </body>
 </html>
