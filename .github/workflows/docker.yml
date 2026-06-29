@@ -72,7 +72,7 @@ jobs:
           source: "stack.yml,Makefile"
           target: "/home/${{ secrets.VPS_USER }}/espacio"
 
-      # 7. Despliegue de los servicios (CON INTEGRACIÓN DE NOMBRE DE PAQUETE REAL Y CORRECCIÓN TTY)
+      # 7. Despliegue de los servicios (CON INTEGRACIÓN DE NOMBRE DE PAQUETE REAL Y  TTY)
       - name: Despliegue de los servicios
         uses: appleboy/ssh-action@v1
         with:
