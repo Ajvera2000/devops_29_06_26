@@ -16,7 +16,7 @@ MESES_ES = {
 
 # Transformado: Tareas DevOps -> Eventos Astronómicos / Órbitas de Misiones
 EVENTOS_ESPACIALES = {
-    5: ["Alineación orbital Satélite Kepler-12", "Descarga de telemetría de Marte"],
+    5: ["Alineaciónnn orbital Satélite Kepler-12", "Descarga de telemetría de Marte"],
     12: ["Lanzamiento del cohete Falcon-X v5.1.0", "Apertura de escudo térmico"],
     18: ["Auditoría de Escudos Defensivos - Parche de software cuántico"],
     25: ["Paso del asteroide AX-2026 y recolección de espectro en AWS (Alpha-Wave System)"]
