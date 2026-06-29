@@ -5,7 +5,7 @@ import re
 
 app = Flask(__name__)
 
-VERSION = "5.2.0"  # Incrementamos versión por la actualización del módulo de recreación espacial
+VERSION = "6.0.0"  # Salto de versión mayor por integración de la Suite Holográfica de Juegos
 
 MESES_ES = {
     1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
@@ -13,7 +13,6 @@ MESES_ES = {
     9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
 }
 
-# Eventos Astronómicos / Órbitas de Misiones
 EVENTOS_ESPACIALES = {
     5: ["Alineación orbital Satélite Kepler-12", "Descarga de telemetría de Marte"],
     12: ["Lanzamiento del cohete Falcon-X v5.1.0", "Apertura de escudo térmico"],
@@ -83,19 +82,66 @@ body {
 
 .reloj-contenedor { background-color: var(--bs-light-bg-subtle); border: 1px solid var(--bs-border-color-translucent); }
 
-/* Estilos del Juego de la Culebrita */
-#snakeCanvas {
+/* --- ESTILOS DE LA SUITE DE JUEGOS --- */
+#arcadeCanvas {
     background-color: #020617;
-    border: 2px solid #334155;
+    border: 2px solid #1e293b;
     border-radius: 8px;
     display: block;
     margin: 0 auto;
 }
 .score-board {
     font-family: 'Courier New', monospace;
-    font-size: 1rem;
-    color: #34d399;
+    font-size: 1.1rem;
+    color: #38bdf8;
 }
+.juego-contenedor {
+    display: none;
+}
+.juego-contenedor.active {
+    display: block;
+}
+/* Tableros HTML para Tres en Raya y Conecta 4 */
+.ttt-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    max-width: 200px;
+    margin: 0 auto;
+}
+.ttt-cell {
+    aspect-ratio: 1;
+    background: #0f172a;
+    border: 2px solid #3b82f6;
+    border-radius: 8px;
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #f8fafc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+.ttt-cell:hover { background: #1e293b; }
+
+.c4-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    max-width: 260px;
+    margin: 0 auto;
+    background: #1e3a8a;
+    padding: 8px;
+    border-radius: 8px;
+}
+.c4-cell {
+    aspect-ratio: 1;
+    background: #020617;
+    border-radius: 50%;
+    cursor: pointer;
+}
+.c4-cell.p1 { background: #ef4444; }
+.c4-cell.p2 { background: #eab308; }
 """
 
 PLANTILLA_HTML = """
@@ -145,17 +191,35 @@ PLANTILLA_HTML = """
                 </div>
 
                 <div class="card p-4 shadow-sm">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
                         <div class="d-flex align-items-center">
-                            <div class="rounded-3 p-2 me-3" style="background-color: #dcfce7; color: #15803d;"><i class="bi bi-controller fs-4"></i></div>
-                            <h5 class="mb-0 fw-bold text-secondary">Simulador Quantum Snake</h5>
+                            <div class="rounded-3 p-2 me-2" style="background-color: #dcfce7; color: #15803d;"><i class="bi bi-controller fs-5"></i></div>
+                            <h5 class="mb-0 fw-bold text-secondary fs-6">Centro de Recreación</h5>
                         </div>
-                        <span class="score-board fw-bold" id="score">SCORE: 0</span>
+                        <span class="score-board fw-bold small" id="globalScore">SCORE: 0</span>
                     </div>
-                    <p class="small text-muted mb-3 text-center">Usa las <b>flechas del teclado</b> para recolectar las sondas de energía verde.</p>
-                    <canvas id="snakeCanvas" width="280" height="200"></canvas>
+
+                    <select class="form-select form-select-sm mb-3" id="gameSelector" onchange="cambiarJuego(this.value)">
+                        <option value="snake">Quantum Snake (Culebrita)</option>
+                        <option value="naves">Space Defender (Navecitas)</option>
+                        <option value="ttt">Hyper Tic-Tac-Toe (3 en Raya)</option>
+                        <option value="c4">Orbital Connect 4 (Conecta 4)</option>
+                    </select>
+
+                    <div id="canvasContainer" class="position-relative text-center mx-auto" style="width: 280px; height: 200px;">
+                        <canvas id="arcadeCanvas" width="280" height="200" class="w-100 h-100"></canvas>
+                        
+                        <div id="tttContainer" class="juego-contenedor position-absolute top-50 start-50 translate-middle w-100">
+                            <div class="ttt-grid" id="tttGrid"></div>
+                        </div>
+
+                        <div id="c4Container" class="juego-contenedor position-absolute top-50 start-50 translate-middle w-100">
+                            <div class="c4-grid" id="c4Grid"></div>
+                        </div>
+                    </div>
+
                     <div class="text-center mt-3">
-                        <button class="btn btn-outline-info btn-sm px-3" onclick="resetearJuego()"><i class="bi bi-play-fill"></i> Reiniciar Enlace</button>
+                        <button class="btn btn-outline-info btn-sm px-3" onclick="reiniciarJuegoActual()"><i class="bi bi-arrow-clockwise"></i> Reiniciar Matriz</button>
                     </div>
                 </div>
             </div>
@@ -200,8 +264,8 @@ PLANTILLA_HTML = """
                         <button class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('terminal').innerHTML=''"><i class="bi bi-trash3"></i> Limpiar Telemetría</button>
                     </div>
                     <div class="terminal-logs" id="terminal">
-                        <span class="log-info">[COSMOS CORE] Inicializando inteligencia artificial de mapeo estelar... OK</span><br>
-                        <span class="log-success">[SUCCESS] Enlace cuántico establecido con la estación base terrícola.</span><br>
+                        <span class="log-info">[COSMOS CORE] Inicializando suite multi-simulación cuántica... OK</span><br>
+                        <span class="log-success">[SUCCESS] Sistemas listos para operaciones de recreación del comandante Angelo Vera.</span><br>
                     </div>
                 </div>
             </div>
@@ -214,22 +278,15 @@ PLANTILLA_HTML = """
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // --- SISTEMA GENERAL ---
         const htmlElement = document.documentElement;
-        const themeIcon = document.getElementById('themeIcon');
-        const themeText = document.getElementById('themeText');
+        const term = document.getElementById('terminal');
 
         function cambiarModo() {
             const nuevoTema = htmlElement.getAttribute('data-bs-theme') === 'light' ? 'dark' : 'light';
-            aplicarTema(nuevoTema);
-        }
-
-        function aplicarTema(tema) {
-            htmlElement.setAttribute('data-bs-theme', tema);
-            if (tema === 'dark') {
-                themeIcon.className = 'bi bi-sun-fill me-2'; themeText.innerText = 'Modo Claro';
-            } else {
-                themeIcon.className = 'bi bi-moon-stars-fill me-2'; themeText.innerText = 'Modo Oscuro';
-            }
+            htmlElement.setAttribute('data-bs-theme', nuevoTema);
+            document.getElementById('themeIcon').className = nuevoTema === 'dark' ? 'bi bi-sun-fill me-2' : 'bi bi-moon-stars-fill me-2';
+            document.getElementById('themeText').innerText = nuevoTema === 'dark' ? 'Modo Claro' : 'Modo Oscuro';
         }
 
         function actualizarReloj() {
@@ -240,11 +297,14 @@ PLANTILLA_HTML = """
         }
         setInterval(actualizarReloj, 1000); actualizarReloj();
 
-        // Carga dinámica de Eventos Espaciales mediante la API interna
+        function logTerminal(msg, tipo='info') {
+            const colores = { info: 'log-info', success: 'log-success', error: 'log-error' };
+            term.innerHTML += `<span class="${colores[tipo]}">[${new Date().toLocaleTimeString()}] ${msg}</span><br>`;
+            term.scrollTop = term.scrollHeight;
+        }
+
         function verTareas(dia, mes, ano) {
-            const term = document.getElementById('terminal');
-            term.innerHTML += `<span class="log-info">[${new Date().toLocaleTimeString()}] [TELEMETRÍA] Consultando coordenadas orbitales para el día ${dia}/${mes}/${ano}...</span><br>`;
-            
+            logTerminal(`[TELEMETRÍA] Consultando coordenadas orbitales para el día ${dia}/${mes}/${ano}...`);
             fetch(`/api/eventos?day=${dia}`)
                 .then(res => res.json())
                 .then(data => {
@@ -252,129 +312,243 @@ PLANTILLA_HTML = """
                     lista.innerHTML = "";
                     if(data.eventos.length === 0) {
                         lista.innerHTML = "<li>No hay misiones programadas para esta fecha estelar.</li>";
-                        term.innerHTML += `<span class="log-info">[${new Date().toLocaleTimeString()}] [MONITOR] Cuadrante despejado el día ${dia}.</span><br>`;
+                        logTerminal(`[MONITOR] Cuadrante despejado el día ${dia}.`);
                     } else {
                         data.eventos.forEach(evt => {
                             lista.innerHTML += `<li class="fw-bold text-info">${evt}</li>`;
-                            term.innerHTML += `<span class="log-success">[${new Date().toLocaleTimeString()}] [EVENTO] Detectado: ${evt}</span><br>`;
+                            logTerminal(`[EVENTO] Detectado: ${evt}`, 'success');
                         });
                     }
-                    term.scrollTop = term.scrollHeight;
                 });
         }
 
-        // --- LÓGICA DEL JUEGO DE LA CULEBRITA ---
-        const canvas = document.getElementById("snakeCanvas");
+        // --- ENGINE DE LA SUITE DE JUEGOS ---
+        const canvas = document.getElementById("arcadeCanvas");
         const ctx = canvas.getContext("2d");
-        const scale = 10;
-        const rows = canvas.height / scale;
-        const columns = canvas.width / scale;
+        let juegoActual = "snake";
+        let loopPrincipal;
 
-        let snake = [];
-        let food = {};
-        let d = "RIGHT";
+        // Variables de Control Global
         let score = 0;
-        let gameInterval;
+        const scale = 10;
 
-        function iniciarJuego() {
-            snake = [{ x: 5 * scale, y: 5 * scale }];
-            generarComida();
-            d = "RIGHT";
-            score = 0;
-            document.getElementById("score").innerText = "SCORE: " + score;
-            if(gameInterval) clearInterval(gameInterval);
-            gameInterval = setInterval(dibujarJuego, 90);
+        function cambiarJuego(tipo) {
+            juegoActual = tipo;
+            clearInterval(loopPrincipal);
+            document.getElementById("tttContainer").classList.remove("active");
+            document.getElementById("c4Container").classList.remove("active");
+            canvas.style.display = "block";
+
+            logTerminal(`[SISTEMA] Cargando módulo holográfico: ${tipo.toUpperCase()}`);
+            reiniciarJuegoActual();
         }
 
-        function generarComida() {
-            food = {
-                x: Math.floor(Math.random() * columns) * scale,
-                y: Math.floor(Math.random() * rows) * scale
+        function reiniciarJuegoActual() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            score = 0;
+            actScore();
+            if (juegoActual === "snake") initSnake();
+            else if (juegoActual === "naves") initNaves();
+            else if (juegoActual === "ttt") initTTT();
+            else if (juegoActual === "c4") initC4();
+        }
+
+        function actScore() {
+            document.getElementById("globalScore").innerText = "SCORE: " + score;
+        }
+
+        // --- INTERCEPCIÓN DE TECLADO ---
+        document.addEventListener("keydown", function(e) {
+            if([32, 37, 38, 39, 40].includes(e.keyCode)) e.preventDefault();
+            if (juegoActual === "snake") controlSnake(e.keyCode);
+            if (juegoActual === "naves") controlNaves(e.keyCode);
+        });
+
+        // ==========================================
+        // MÓDULO 1: QUANTUM SNAKE
+        // ==========================================
+        let snake, snakeFood, snakeDir;
+        function initSnake() {
+            snake = [{x: 50, y: 50}];
+            snakeDir = "RIGHT";
+            genSnakeFood();
+            loopPrincipal = setInterval(loopSnake, 90);
+        }
+        function genSnakeFood() {
+            snakeFood = {
+                x: Math.floor(Math.random() * (canvas.width/scale)) * scale,
+                y: Math.floor(Math.random() * (canvas.height/scale)) * scale
             };
         }
-
-        document.addEventListener("keydown", direction);
-        function direction(event) {
-            let key = event.keyCode;
-            // Prevenir scroll de la página con las flechas
-            if([37, 38, 39, 40].includes(key)) event.preventDefault();
-
-            if (key == 37 && d != "RIGHT") d = "LEFT";
-            else if (key == 38 && d != "DOWN") d = "UP";
-            else if (key == 39 && d != "LEFT") d = "RIGHT";
-            else if (key == 40 && d != "UP") d = "DOWN";
+        function controlSnake(key) {
+            if (key == 37 && snakeDir != "RIGHT") snakeDir = "LEFT";
+            if (key == 38 && snakeDir != "DOWN") snakeDir = "UP";
+            if (key == 39 && snakeDir != "LEFT") snakeDir = "RIGHT";
+            if (key == 40 && snakeDir != "UP") snakeDir = "DOWN";
         }
+        function loopSnake() {
+            ctx.fillStyle = "#020617"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Dibujar comida
+            ctx.fillStyle = "#34d399"; ctx.fillRect(snakeFood.x, snakeFood.y, scale, scale);
+            
+            // Avanzar Cabeza
+            let headX = snake[0].x; let headY = snake[0].y;
+            if(snakeDir === "LEFT") headX -= scale; if(snakeDir === "UP") headY -= scale;
+            if(snakeDir === "RIGHT") headX += scale; if(snakeDir === "DOWN") headY += scale;
 
-        function dibujarJuego() {
-            ctx.fillStyle = "#020617";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Dibujar Culebrita (Color Cian espacial)
-            for (let i = 0; i < snake.length; i++) {
-                ctx.fillStyle = i == 0 ? "#22d3ee" : "#0891b2";
-                ctx.fillRect(snake[i].x, snake[i].y, scale, scale);
-                ctx.strokeStyle = "#020617";
-                ctx.strokeRect(snake[i].x, snake[i].y, scale, scale);
-            }
-
-            // Dibujar Comida (Sonda Verde esmeralda)
-            ctx.fillStyle = "#34d399";
-            ctx.fillRect(food.x, food.y, scale, scale);
-
-            // Posición previa de la cabeza
-            let snakeX = snake[0].x;
-            let snakeY = snake[0].y;
-
-            // Dirección
-            if (d == "LEFT") snakeX -= scale;
-            if (d == "UP") snakeY -= scale;
-            if (d == "RIGHT") snakeX += scale;
-            if (d == "DOWN") snakeY += scale;
-
-            // Si la culebrita come
-            if (snakeX == food.x && snakeY == food.y) {
-                score++;
-                document.getElementById("score").innerText = "SCORE: " + score;
-                generarComida();
-                document.getElementById('terminal').innerHTML += `<span class="log-success">[${new Date().toLocaleTimeString()}] [SNAKE] Sonda de energía recolectada. Nivel de carga: ${score}</span><br>`;
-                const term = document.getElementById('terminal');
-                term.scrollTop = term.scrollHeight;
-            } else {
-                snake.pop(); // Quita la cola
-            }
-
-            let newHead = { x: snakeX, y: snakeY };
-
-            // Control de colisiones (Paredes o ella misma)
-            if (snakeX < 0 || snakeY < 0 || snakeX >= canvas.width || snakeY >= canvas.height || collision(newHead, snake)) {
-                clearInterval(gameInterval);
-                document.getElementById('terminal').innerHTML += `<span class="log-error">[${new Date().toLocaleTimeString()}] [SNAKE] COLISIÓN DETECTADA. Simulación finalizada. Puntaje: ${score}</span><br>`;
-                const term = document.getElementById('terminal');
-                term.scrollTop = term.scrollHeight;
-                
-                // Efecto Game Over en Canvas
-                ctx.fillStyle = "rgba(248, 113, 113, 0.8)";
-                ctx.font = "16px 'Courier New'";
-                ctx.fillText("CONEXIÓN PERDIDA", 65, 100);
+            let newHead = {x: headX, y: headY};
+            if(headX < 0 || headY < 0 || headX >= canvas.width || headY >= canvas.height || snake.some(s => s.x === newHead.x && s.y === newHead.y)) {
+                clearInterval(loopPrincipal);
+                logTerminal("[SNAKE] Red cuántica colapsada. Juego Terminado.", "error");
                 return;
             }
 
             snake.unshift(newHead);
+            if(headX === snakeFood.x && headY === snakeFood.y) { score++; actScore(); genSnakeFood(); } else { snake.pop(); }
+
+            ctx.fillStyle = "#22d3ee";
+            snake.forEach(s => ctx.fillRect(s.x, s.y, scale, scale));
         }
 
-        function collision(head, array) {
-            for (let i = 0; i < array.length; i++) {
-                if (head.x == array[i].x && head.y == array[i].y) return true;
+        // ==========================================
+        // MÓDULO 2: SPACE DEFENDER (NAVECITAS)
+        // ==========================================
+        let naveX, proyectiles, asteroides;
+        function initNaves() {
+            naveX = canvas.width / 2;
+            proyectiles = [];
+            asteroides = [];
+            loopPrincipal = setInterval(loopNaves, 40);
+        }
+        function controlNaves(key) {
+            if(key == 37 && naveX > 10) naveX -= 15;
+            if(key == 39 && naveX < canvas.width - 20) naveX += 15;
+            if(key == 32) proyectiles.push({x: naveX + 5, y: canvas.height - 20});
+        }
+        function loopNaves() {
+            ctx.fillStyle = "#020617"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Dibujar nave
+            ctx.fillStyle = "#a855f7"; ctx.fillRect(naveX, canvas.height - 15, 15, 10);
+
+            // Spawn Asteroides
+            if(Math.random() < 0.07) asteroides.push({x: Math.random()*(canvas.width-10), y: 0});
+
+            // Actualizar Balas
+            ctx.fillStyle = "#38bdf8";
+            proyectiles.forEach((p, pi) => {
+                p.y -= 6; ctx.fillRect(p.x, p.y, 3, 7);
+                if(p.y < 0) proyectiles.splice(pi, 1);
+            });
+
+            // Actualizar Asteroides
+            ctx.fillStyle = "#ef4444";
+            asteroides.forEach((ast, ai) => {
+                ast.y += 3; ctx.fillRect(ast.x, ast.y, 10, 10);
+                if(ast.y > canvas.height) { clearInterval(loopPrincipal); logTerminal("[DEFENDER] Escudos vulnerados. Base destruida.", "error"); }
+                
+                // Colisiones
+                proyectiles.forEach((p, pi) => {
+                    if(p.x >= ast.x && p.x <= ast.x + 10 && p.y >= ast.y && p.y <= ast.y + 10) {
+                        asteroides.splice(ai, 1); proyectiles.splice(pi, 1);
+                        score++; actScore();
+                    }
+                });
+            });
+        }
+
+        // ==========================================
+        // MÓDULO 3: HYPER TIC-TAC-TOE (3 EN RAYA)
+        // ==========================================
+        let tttBoard, turnoTTT;
+        function initTTT() {
+            canvas.style.display = "none";
+            const container = document.getElementById("tttContainer");
+            container.classList.add("active");
+            const grid = document.getElementById("tttGrid");
+            grid.innerHTML = "";
+            tttBoard = Array(9).fill(null);
+            turnoTTT = "X";
+            
+            for(let i=0; i<9; i++) {
+                let cell = document.createElement("div");
+                cell.className = "ttt-cell";
+                cell.dataset.id = i;
+                cell.addEventListener("click", clickTTT);
+                grid.appendChild(cell);
             }
+        }
+        function clickTTT(e) {
+            let id = e.target.dataset.id;
+            if(tttBoard[id] || verificarGanadorTTT()) return;
+
+            tttBoard[id] = turnoTTT;
+            e.target.innerText = turnoTTT;
+            e.target.style.color = turnoTTT === "X" ? "#38bdf8" : "#ec4899";
+
+            if(verificarGanadorTTT()) {
+                logTerminal(`[3 EN RAYA] Victoria del nodo espacial: ${turnoTTT}`, "success");
+                score += 10; actScore();
+                return;
+            }
+            turnoTTT = turnoTTT === "X" ? "O" : "X";
+        }
+        function verificarGanadorTTT() {
+            const combinaciones = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+            return combinaciones.some(c => tttBoard[c[0]] && tttBoard[c[0]] === tttBoard[c[1]] && tttBoard[c[0]] === tttBoard[c[2]]);
+        }
+
+        // ==========================================
+        // MÓDULO 4: ORBITAL CONNECT 4 (CONECTA 4)
+        // ==========================================
+        let c4Board, turnoC4;
+        function initC4() {
+            canvas.style.display = "none";
+            document.getElementById("c4Container").classList.add("active");
+            const grid = document.getElementById("c4Grid");
+            grid.innerHTML = "";
+            c4Board = Array(6).fill(null).map(() => Array(7).fill(0));
+            turnoC4 = 1;
+
+            for(let r=0; r<6; r++) {
+                for(let c=0; c<7; c++) {
+                    let cell = document.createElement("div");
+                    cell.className = "c4-cell";
+                    cell.id = `c4-${r}-${c}`;
+                    cell.addEventListener("click", () => clickC4(c));
+                    grid.appendChild(cell);
+                }
+            }
+        }
+        function clickC4(col) {
+            for(let r=5; r>=0; r--) {
+                if(c4Board[r][col] === 0) {
+                    c4Board[r][col] = turnoC4;
+                    let cell = document.getElementById(`c4-${r}-${col}`);
+                    cell.classList.add(turnoC4 === 1 ? 'p1' : 'p2');
+                    
+                    if(verificarC4(r, col)) {
+                        logTerminal(`[CONECTA 4] Flota ${turnoC4 === 1 ? 'ROJA' : 'AMARILLA'} asegura el cuadrante.`, "success");
+                        score += 20; actScore();
+                        return;
+                    }
+                    turnoC4 = turnoC4 === 1 ? 2 : 1;
+                    return;
+                }
+            }
+        }
+        function verificarC4(r, c) {
+            let p = c4Board[r][c];
+            // Validación simplificada de filas/columnas en entorno local
+            let h=0, v=0;
+            for(let i=0; i<7; i++) { h = (c4Board[r][i] === p) ? h+1 : 0; if(h>=4) return true; }
+            for(let i=0; i<6; i++) { v = (c4Board[i][c] === p) ? v+1 : 0; if(v>=4) return true; }
             return false;
         }
 
-        function resetearJuego() {
-            iniciarJuego();
-        }
-
-        // Ejecutar juego al cargar la página
-        iniciarJuego();
+        // Arranque inicial automático
+        cambiarJuego("snake");
     </script>
 </body>
 </html>
@@ -388,9 +562,7 @@ class CalendarioEspacial(calendar.HTMLCalendar):
         self.ano_vista = ano_vista
 
     def formatday(self, day, weekday):
-        if day == 0:
-            return '<td class="nonday">&nbsp;</td>'
-        
+        if day == 0: return '<td class="nonday">&nbsp;</td>'
         clase_css = "tiene-tarea" if day in self.eventos else ""
         return f'<td class="{clase_css}" onclick="verTareas({day}, {self.mes_vista}, {self.ano_vista})">{day}</td>'
 
@@ -412,25 +584,17 @@ class CalendarioEspacial(calendar.HTMLCalendar):
 @app.route('/')
 def home():
     hoy = datetime.now()
-    
     mes_vista = request.args.get('month', default=hoy.month, type=int)
     ano_vista = request.args.get('year', default=hoy.year, type=int)
     
-    if mes_vista < 1 or mes_vista > 12:
-        mes_vista = hoy.month
-
+    if mes_vista < 1 or mes_vista > 12: mes_vista = hoy.month
     nombre_mes_vista = MESES_ES[mes_vista]
 
-    # Lógica de navegación de meses y años
     prev_mes = mes_vista - 1 if mes_vista > 1 else 12
     prev_ano = ano_vista if mes_vista > 1 else ano_vista - 1
     next_mes = mes_vista + 1 if mes_vista < 12 else 1
     next_ano = ano_vista if mes_vista < 12 else ano_vista + 1
 
-    prev_ano_solo = ano_vista - 1
-    next_ano_solo = ano_vista + 1
-
-    # Inyectar eventos solo si coincide con el mes de Mayo para demostración
     eventos_mes = EVENTOS_ESPACIALES if mes_vista == 5 else {}
 
     cal = CalendarioEspacial(eventos_mes, mes_vista, ano_vista)
@@ -449,14 +613,13 @@ def home():
         prev_ano=prev_ano,
         next_mes=next_mes,
         next_ano=next_ano,
-        prev_ano_solo=prev_ano_solo,
-        next_ano_solo=next_ano_solo
+        prev_ano_solo=ano_vista - 1,
+        next_ano_solo=ano_vista + 1
     )
 
 @app.route('/api/eventos')
 def api_eventos():
     day = request.args.get('day', default=0, type=int)
-    # Simula la obtención de eventos del diccionario estelar
     eventos = EVENTOS_ESPACIALES.get(day, [])
     return jsonify({"day": day, "eventos": eventos})
 
